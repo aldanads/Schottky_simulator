@@ -15,13 +15,19 @@ MoS2_layer,paths,rng,defects_list = initialization(n_sim,save_data)
 
 carry_on = True
 i = 0
+
+MoS2_layer.plot_particles()
+
 while carry_on:
     i += 1
     
+    MoS2_layer.SolvePotentialAndField(-2)
     MoS2_layer,defects_list = KMC(MoS2_layer,rng,defects_list)
-    #MoS2_layer.SolvePotentialAndField(2)
-    MoS2_layer.plot_particles()
     
-    if i > 50:
+    if i%50 == 0:
+        MoS2_layer.plot_particles()
+
+    
+    if i > 1000:
         break
     

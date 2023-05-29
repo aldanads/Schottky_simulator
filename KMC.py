@@ -12,10 +12,17 @@ def KMC(MoS2_layer,rng,defects_list):
     
     
     TR_list = [] # Catalog of  non-zero transition rates in the system
+    Ex = MoS2_layer.Ex
+    Ey = MoS2_layer.Ey
+    Ez = MoS2_layer.Ez
     
+    steps = MoS2_layer.steps
        
     # Collect non-zero transition rates for each defect
     for i, defect in enumerate(defects_list):
+
+        defect.transition_rates(Ex,Ey,Ez,steps)
+    
         # Transition rate of event j of defect i
         TR_list.extend([(TR, j, i) for j, TR in enumerate(defect.TR) if TR != 0.0])
     
@@ -23,9 +30,20 @@ def KMC(MoS2_layer,rng,defects_list):
     chosen_event,time = choose_event(TR_list,rng) # Choose an event and time step
     
     Vs = defects_list[chosen_event[2]]  # Get the defect corresponding to the chosen event
-    Vs.processes(chosen_event[1], MoS2_layer)  # Apply the chosen event to the system
+    
+    if time > 1: 
+        time = 1
+        P = 1 - np.exp(-chosen_event[0]*time)
+    
+        if (rng.random() < P):
+            Vs.processes(chosen_event[1], MoS2_layer)  # Apply the chosen event to the system
+    
+            MoS2_layer.time_event_track(time, chosen_event[1])  # Update time and event count
+            
+    else:
+        Vs.processes(chosen_event[1], MoS2_layer)  # Apply the chosen event to the system
 
-    MoS2_layer.time_event_track(time, chosen_event[1])  # Update time and event count
+        MoS2_layer.time_event_track(time, chosen_event[1])  # Update time and event count
     
     
     return MoS2_layer,defects_list
@@ -57,6 +75,8 @@ def choose_event(TR_list,rng):
 
     #Calculate the time step
     time = -np.log(rng.random()) / sumTR
+    
+        
     
     return chosen_event,time
     

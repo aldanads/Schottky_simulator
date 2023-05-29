@@ -14,12 +14,12 @@ class Defects():
         
         self.coord_xyz = coord_xyz
         self.Act_energy = Act_energy
-        
         self.length_x = len(Grid_states)-1
         self.length_y = len(Grid_states[0])-1
         self.length_z = len(Grid_states[0][0])-1
         
         self.neighbors(Grid_states)
+
         self.transition_rates()
         
     
@@ -30,7 +30,6 @@ class Defects():
         
         List_neighbors = [0] * 6 # Six directions: 2 each axix
  
-        
         i,j,k = self.coord_xyz[0],self.coord_xyz[1],self.coord_xyz[2]
 
         
@@ -62,7 +61,17 @@ class Defects():
     """
     ---------------- Calculate Transition Rates -----------------
     """ 
-    def transition_rates(self):
+    def transition_rates(self,Ex=None,Ey=None,Ez=None,steps=None):
+        
+        i,j,k = self.coord_xyz[0],self.coord_xyz[1],self.coord_xyz[2]
+        
+        energy_modulation = 0
+        if Ex is not None:
+            # Energy modulation by the electric field - These indexes match Act_energy indexes
+            energy_modulation = np.array([Ex[i,j,k]*steps[0],-Ex[i,j,k]*steps[0],
+                                 Ey[i,j,k]*steps[1],-Ey[i,j,k]*steps[1],
+                                 Ez[i,j,k]*steps[2],-Ez[i,j,k]*steps[1]])*1e-9
+            
         
         available_idx = [i for i, item in enumerate(self.List_neighbors) if not isinstance(item, tuple)]
         TR = np.zeros(len(self.Act_energy))
@@ -70,30 +79,17 @@ class Defects():
         kb = 8.6173324E-5 # Boltzmann constant
         nu0=7E13;  # nu0 (s^-1) bond vibration frequency
         T = 300
-        
-        TR[available_idx] = nu0*np.exp(-np.array(self.Act_energy)[available_idx]/(kb*T))
+        Energy_mod = (np.array(self.Act_energy)-energy_modulation)
+        Energy_mod[Energy_mod < 0.1] = 0.1
+
+        TR[available_idx] = nu0*np.exp(-Energy_mod[available_idx]/(kb*T))
+      
         
         self.TR = TR
-        
-        return TR
     
-    """
-    def local_field(self):
+
         
-        
-        # Wierzbowski, J., Klein, J., Kaniber, M., Müller, K., & Finley, J. J. 
-        # Polarization control in few-layer MoS2 by electric field induced symmetry breaking.
-        
-        # Dipole moment --> (enm)    %p=40;
-        # p=40;
-        p=15
-    
-        L=1/3
-        relative_permittivity=er-1
-        
-        local_field=E_field*(1+L*relative_permittivity)*p
-        
-    """
+
     
     """
     ---------------- Apply event -----------------

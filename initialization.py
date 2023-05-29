@@ -40,7 +40,7 @@ def initialization(n_sim,save_data):
      Grid parameters
     """
     steps = (0.639,0.639,0.639) # nm | x-y-z
-    device_size = (50, 50, 50) # Size of the grid in nm. grid_size[0] is x, grid_size[1] is y and grid_size[3] is z.
+    device_size = (20, 20, 20) # Size of the grid in nm. grid_size[0] is x, grid_size[1] is y and grid_size[3] is z.
     
     time = 0 # Initialization of time
     
@@ -48,7 +48,7 @@ def initialization(n_sim,save_data):
      Electrical properties
     """
     er = 21 # Relative permitivity
-    screening = 1 # Screening of electric field
+    screening = 0.025 # Screening of electric field
     q = 2 # Particle charge
     
     """
@@ -63,10 +63,10 @@ def initialization(n_sim,save_data):
     #     # Activation energies 
     # =============================================================================
     """
-    E_diffusion = 1
+    E_diffusion = 1.5
     
     # Defects can migrate up-down, lateral x-axis and y-axis
-    Act_energy = [E_diffusion] * 6
+    Act_energy = [E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion+0.5,E_diffusion+0.5]
     
     # Temperature in kelvin
     T = 300
@@ -81,8 +81,9 @@ def initialization(n_sim,save_data):
     MoS2_layer = ActiveMaterial(Act_energy,device_size,steps,time,er,screening,electrodes,q)
 
     # Introducing defects in the active layer
-    n_defects = 3
+    n_defects = 50
     defects_list = MoS2_layer.introducing_defects(rng, n_defects)
+    #defects_list = MoS2_layer.test_1(rng)
     
     
     return MoS2_layer,paths,rng,defects_list

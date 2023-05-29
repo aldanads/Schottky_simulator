@@ -31,9 +31,6 @@ class ActiveMaterial():
         
         
         
-        
-        
-        
     """  
     ---------------------------------------------
     --------------- Define grid -----------------
@@ -58,7 +55,6 @@ class ActiveMaterial():
 
         while len(defects_list) < n_defects:
             Vs_ijk = rng.integers(0, grid_points, size=3)
-            
 
             if tuple(Vs_ijk) not in chosen_coordinates:
                 chosen_coordinates.add(tuple(Vs_ijk))
@@ -67,6 +63,23 @@ class ActiveMaterial():
 
         return defects_list
     
+    def test_1(self,rng):
+        
+        defects_list = [] # Initialize defects_list
+
+        x_axis_paralallel = [np.array([6,6,6]),np.array([5,6,6])] 
+        y_axis_paralallel = [np.array([6,6,6]),np.array([6,5,6])]
+        z_axis_paralallel = [np.array([6,6,6]),np.array([6,6,5])]
+        single_particle = [np.array([6,6,6])]
+        
+        test_defects = [x_axis_paralallel,y_axis_paralallel,z_axis_paralallel,single_particle]
+        
+        for Vs in test_defects[3]:
+            defects_list.append(Defects(Vs, self.Act_energy, self.Grid_states))
+            self.Grid_states[tuple(Vs)] = 1
+        
+        return defects_list
+
     
     def time_event_track(self,t,chosen_event):
         
@@ -143,6 +156,7 @@ class ActiveMaterial():
             count = self.check_convergence(u,u2,tol,nx,ny,nz)
             
         self.u = self.corners(u)
+        
         self.Electric_field()
             
         
@@ -150,7 +164,7 @@ class ActiveMaterial():
     def dirichtlet(self,V,u):
         
         u[self.electrodes[1]:,:,-1] = 0 # Electrode on the left grounded
-        u[:,:,0] = 0 # Bottom of the active layer grounded
+        #u[:,:,0] = 0 # Bottom of the active layer grounded
 
         u[:self.electrodes[0],:,-1] = V # Electrode on the right with voltage V
 
@@ -190,6 +204,8 @@ class ActiveMaterial():
         u[1:-1,0,1:-1] = u1[1:-1,1,1:-1] # y = 0
         u[1:-1,-1,1:-1] = u1[1:-1,-2,1:-1] # maximum y
         
+        u[1:-1,1:-1,0] = u1[1:-1,1:-1,0] # maximum y
+
         # Z maximum - space between electrodes
         u[self.electrodes[0]:self.electrodes[1],1:-1,-1] = u1[self.electrodes[0]:self.electrodes[1],1:-1,-2]
         
@@ -223,8 +239,32 @@ class ActiveMaterial():
         # Introduce the steps in m
         Ex, Ey, Ez = np.gradient(self.u,self.steps[0]*1e-9,self.steps[1]*1e-9,self.steps[2]*1e-9)
         
-        self.Ex = -Ex
-        self.Ey = -Ey
-        self.Ez = -Ez
+        self.Ex = -self.local_field(Ex)
+        self.Ey = -self.local_field(Ey)
+        self.Ez = -self.local_field(Ez)
+        
+    def local_field(self,E_field):
+           
+        """
+        Padovani, A., Larcher, L., Pirrotta, O., Vandelli, L., & Bersuker, G. (2015). 
+        Microscopic modeling of HfO x RRAM operations: From forming to switching. 
+        IEEE Transactions on electron devices, 62(6), 1998-2006.
+        
+        
+        # Wierzbowski, J., Klein, J., Kaniber, M., Müller, K., & Finley, J. J. 
+        # Polarization control in few-layer MoS2 by electric field induced symmetry breaking.
+        """
+        # Dipole moment --> (enm)    %p=40;
+        # p=40;
+        p=15
+    
+        L=1/3
+        relative_permittivity=self.er-1
+        
+        local_field=E_field*(1+L*relative_permittivity)*p
+        
+        return local_field
+    
+
         
     
