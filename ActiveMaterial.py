@@ -7,6 +7,7 @@ Created on Tue May 23 17:57:25 2023
 import numpy as np
 from defects import Defects
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 
 
@@ -212,8 +213,6 @@ class ActiveMaterial():
         return u
         
     def check_convergence(self,u,u2,tol,nx,ny,nz):
-        
-        
 
         total = nx * ny * nz
         count = 0
