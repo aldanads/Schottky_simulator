@@ -8,6 +8,8 @@ import numpy as np
 from defects import Defects
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
 
 
 
@@ -103,16 +105,47 @@ class ActiveMaterial():
 
         ax.scatter3D(x, y, z, c='blue', marker='o')
         
-
-        ax.set_xlim(0, self.Grid_states.shape[0]* self.steps[0])
-        ax.set_ylim(0, self.Grid_states.shape[1]* self.steps[1])
-        ax.set_zlim(0, self.Grid_states.shape[2]* self.steps[2])
+        x_lim = self.Grid_states.shape[0] * self.steps[0]
+        y_lim = self.Grid_states.shape[1] * self.steps[1]
+        z_lim = self.Grid_states.shape[2] * self.steps[2]
+        
+        ax.set_xlim(0, x_lim)
+        ax.set_ylim(0, y_lim)
+        ax.set_zlim(0, z_lim)
         
         ax.set_xlabel('x-axis (nm)')
         ax.set_ylabel('y-axis (nm)')
         ax.set_zlabel('z-axis (nm)')
         
+        
+        """
+         -------------  Electrodes ---------------
+        """
+        left_electrode_vertices = [
+        [0, self.electrodes[0] * self.steps[0], self.electrodes[0] * self.steps[0], 0, 0],
+        [0, 0, y_lim, y_lim, 0],
+        [z_lim, z_lim, z_lim, z_lim, z_lim]
+    ]
+
+        right_electrode_vertices = [
+        [self.electrodes[1] * self.steps[0], x_lim, x_lim, self.electrodes[1] * self.steps[0], self.electrodes[1] * self.steps[0]],
+        [0, 0, y_lim, y_lim, 0],
+        [z_lim, z_lim, z_lim, z_lim, z_lim]
+    ]
+        
+        electrode_vertices = [left_electrode_vertices, right_electrode_vertices]
+    
+        for vertices in electrode_vertices:
+            # Create the 3D collection of polygons for the rectangular prism
+            poly3d = Poly3DCollection([list(zip(*vertices))], facecolors='b', alpha=0.5)
+            poly3d.set_edgecolor('k')  # Set edge color for better visibility
+    
+            # Add the collection to the plot
+            ax.add_collection3d(poly3d)
+        
+        
         plt.show()
+        
         
         
     """
@@ -122,7 +155,7 @@ class ActiveMaterial():
     """
     def SolvePotentialAndField(self,V):
         
-        nx, ny, nz = self.Grid_states.shape[0],self.Grid_states.shape[1],self.Grid_states.shape[2]
+        nx, ny, nz = self.Grid_states.shape
 
         
         num = round(nx*ny*nz) ** (1/3)
@@ -176,7 +209,7 @@ class ActiveMaterial():
         
         qe=1.602176565e-19 # Charge of an electron (C)
         e0=8.8541878176e-12 # Vacuum permittivity (F/m)
-        vol = self.steps[0]*self.steps[1]*self.steps[2] * (1E-9)
+        vol = np.prod(self.steps) * (1E-9)
         
         scale_factor = self.steps[0]*self.steps[1]
         density_particle = scale_factor* self.screening * self.q * qe / (vol*e0*self.er)
@@ -264,6 +297,33 @@ class ActiveMaterial():
         
         return local_field
     
+    def density_defects(self,square_size):
+        
+        nx, ny, nz = self.Grid_states.shape
+        density_Vs = np.zeros((nx,ny,nz))
+        
+        vol = (square_size ** 3) * np.prod(self.steps) 
+                
+        for i in range(nx):
+            start_i = max(0, i - square_size // 2)
+            end_i = min(nx-1, start_i + square_size)
+            
+            for j in range(ny):
+                start_j = max(0, j - square_size // 2)
+                end_j = min(ny-1, start_j + square_size)
+                
+                for k in range(nz):
+                    start_k = max(0, k - square_size // 2)
+                    end_k = min(nz - 1, start_k + square_size)
+    
+                
+                        
+                    
+                    density_Vs[i,j,k] = np.sum(self.Grid_states[start_i:end_i,start_j:end_j,start_k:end_k])/vol
+    
+        self.density_Vs = density_Vs
+       
+        
 
         
     

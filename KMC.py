@@ -12,16 +12,14 @@ def KMC(MoS2_layer,rng,defects_list):
     
     
     TR_list = [] # Catalog of  non-zero transition rates in the system
-    Ex = MoS2_layer.Ex
-    Ey = MoS2_layer.Ey
-    Ez = MoS2_layer.Ez
+
     
     steps = MoS2_layer.steps
        
     # Collect non-zero transition rates for each defect
     for i, defect in enumerate(defects_list):
 
-        defect.transition_rates(Ex,Ey,Ez,steps)
+        defect.transition_rates(MoS2_layer.Ex,MoS2_layer.Ey,MoS2_layer.Ez,steps)
     
         # Transition rate of event j of defect i
         TR_list.extend([(TR, j, i) for j, TR in enumerate(defect.TR) if TR != 0.0])
