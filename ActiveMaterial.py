@@ -15,7 +15,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 class ActiveMaterial():
     
-    def __init__(self,Act_energy,device_size,steps,time,er,screening,electrodes,q):
+    def __init__(self,Act_energy,device_size,steps,time,er,screening,electrodes,q,T,schottky_parameters,square_size):
         
         self.Act_energy = Act_energy
         self.device_size = device_size
@@ -24,6 +24,7 @@ class ActiveMaterial():
         self.time.append(time)
         self.Grid_states = self.square_grid()
         self.events = [0]*len(Act_energy)
+        self. T = T
         
         # Electric field parameters
         self.er = er
@@ -32,7 +33,33 @@ class ActiveMaterial():
         self.electrodes = electrodes
         self.u = np.zeros(self.Grid_states.shape)
         
+        # Defect density calculation
+        self.square_size = square_size
         
+        # Electrical parameters
+        # Change to cm --> F/m = C / (V * m) = C / (100 * V * cm)
+        e0 = 8.854187817E-12  # Permittivity of free space F/m = C / (V * m) = (C^2 / (N*cm^2))
+        e_charge = 1.60217663E-19 # Electron charge (C)
+        self.e_er = e_charge/(self.er*e0)
+        self.A0 = 1.202E6 # Richardson constant (A*(m^-2)*(K^-2))
+        kb=8.6173324E-5  # Boltzmann constant (eV/K)
+        self.kb_T = kb * T
+        
+        self.phi_b0 = schottky_parameters[0]
+        self.w = schottky_parameters[1]
+        self.A = schottky_parameters[2]
+        self.n = schottky_parameters[3]
+        self.R = schottky_parameters[4]
+        self.ideality_factor = schottky_parameters[5]
+        self.tol = schottky_parameters[6]
+        
+        # Volume = (size x of the electrode + region of excess of dopants w) * (size y of electrode) * w in z direction
+        self.vol_electrode = (electrodes[0]*steps[0] + schottky_parameters[1]*1e9) * device_size[1] * schottky_parameters[1]*1e9
+        # Cross sectional area perpendicular to the current --> Area of the electrode (m**2)
+        # The electrode are in nm scale
+        self.cross_sectional_area =  device_size[1] * electrodes[0]*steps[0] *1e-18
+
+
         
     """  
     ---------------------------------------------
@@ -61,7 +88,7 @@ class ActiveMaterial():
 
             if tuple(Vs_ijk) not in chosen_coordinates:
                 chosen_coordinates.add(tuple(Vs_ijk))
-                defects_list.append(Defects(Vs_ijk, self.Act_energy, self.Grid_states))
+                defects_list.append(Defects(Vs_ijk, self.Act_energy, self.Grid_states,self.q))
                 self.Grid_states[tuple(Vs_ijk)] = 1
 
         return defects_list
@@ -87,7 +114,7 @@ class ActiveMaterial():
     def time_event_track(self,t,chosen_event):
         
         # Track time
-        self.time.append(self.time[len(self.time)-1] + t)
+        self.time.append(self.time[-1] + t)
         
         #Track events
         self.events[chosen_event] += 1
@@ -197,10 +224,11 @@ class ActiveMaterial():
         
     def dirichtlet(self,V,u):
         
-        u[self.electrodes[1]:,:,-1] = 0 # Electrode on the left grounded
-        #u[:,:,0] = 0 # Bottom of the active layer grounded
+        u[self.electrodes[1]:,:,-1] = V # Electrode on the left grounded
+        u[:,:,0] = 0 # Bottom of the active layer grounded
 
-        u[:self.electrodes[0],:,-1] = V # Electrode on the right with voltage V
+        u[:self.electrodes[0],:,-1] = 0 # Electrode on the right with voltage V
+        
 
         return u
     
@@ -238,7 +266,8 @@ class ActiveMaterial():
         u[1:-1,0,1:-1] = u1[1:-1,1,1:-1] # y = 0
         u[1:-1,-1,1:-1] = u1[1:-1,-2,1:-1] # maximum y
         
-        u[1:-1,1:-1,0] = u1[1:-1,1:-1,0] # maximum y
+        # Neumann boundary condition in the bottom layer
+        #u[1:-1,1:-1,0] = u1[1:-1,1:-1,0] # maximum y
 
         # Z maximum - space between electrodes
         u[self.electrodes[0]:self.electrodes[1],1:-1,-1] = u1[self.electrodes[0]:self.electrodes[1],1:-1,-2]
@@ -276,8 +305,19 @@ class ActiveMaterial():
         self.Ez = -self.local_field(Ez)
         
     def local_field(self,E_field):
+        
            
         """
+        McPherson, J., J. Y. Kim, A. Shanware, and H. Mogul. 
+        "Thermochemical description of dielectric breakdown in high dielectric constant materials." 
+        Applied Physics Letters 82, no. 13 (2003): 2121-2123.
+        Local electric field --> E_loc = E * (2+k)/3
+        
+        McPherson, J. W., and H. C. Mogul. 
+        "Underlying physics of the thermochemical E model in describing low-field time-dependent dielectric breakdown in SiO 2 thin films." 
+        Journal of Applied Physics 84, no. 3 (1998): 1513-1523.
+        Polarization factor
+        
         Padovani, A., Larcher, L., Pirrotta, O., Vandelli, L., & Bersuker, G. (2015). 
         Microscopic modeling of HfO x RRAM operations: From forming to switching. 
         IEEE Transactions on electron devices, 62(6), 1998-2006.
@@ -285,36 +325,45 @@ class ActiveMaterial():
         
         # Wierzbowski, J., Klein, J., Kaniber, M., Müller, K., & Finley, J. J. 
         # Polarization control in few-layer MoS2 by electric field induced symmetry breaking.
+        
+        Klein, Julian, Jakob Wierzbowski, Armin Regler, Jonathan Becker, Florian Heimbach, K. Muller, Michael Kaniber, and Jonathan J. Finley. 
+        "Stark effect spectroscopy of mono-and few-layer MoS2." 
+        Nano letters 16, no. 3 (2016): 1554-1559.
+        p = 0.08 D = 0.0166552e-10 (em)
         """
         # Dipole moment --> (enm)    %p=40;
         # p=40;
-        p=15
+        # p=15
+        
+        #p = 0.0166552e-10
+        #p = 1.266552e-10
     
         L=1/3
-        relative_permittivity=self.er-1
+        susceptibility=self.er-1
         
-        local_field=E_field*(1+L*relative_permittivity)*p
+        local_field=E_field*(1+L*susceptibility)
         
         return local_field
     
-    def density_defects(self,square_size):
+    def density_defects(self):
         
         nx, ny, nz = self.Grid_states.shape
         density_Vs = np.zeros((nx,ny,nz))
+        square_size = self.square_size
         
         vol = (square_size ** 3) * np.prod(self.steps) 
                 
         for i in range(nx):
             start_i = max(0, i - square_size // 2)
-            end_i = min(nx-1, start_i + square_size)
+            end_i = min(nx, start_i + square_size)
             
             for j in range(ny):
                 start_j = max(0, j - square_size // 2)
-                end_j = min(ny-1, start_j + square_size)
+                end_j = min(ny, start_j + square_size)
                 
                 for k in range(nz):
                     start_k = max(0, k - square_size // 2)
-                    end_k = min(nz - 1, start_k + square_size)
+                    end_k = min(nz, start_k + square_size)
     
                 
                         
@@ -322,8 +371,129 @@ class ActiveMaterial():
                     density_Vs[i,j,k] = np.sum(self.Grid_states[start_i:end_i,start_j:end_j,start_k:end_k])/vol
     
         self.density_Vs = density_Vs
+        
+    def Schottky_current_2(self,V):    
+        
+        
+        n = self.n
+        nm3_to_cm3 = 1E21
+        n = n * nm3_to_cm3
+        
+        
+        region_doping = round(self.w * 1E9 / self.steps[2]) # Number of layers
+
+        defects_at_electrodes = np.sum(self.Grid_states[:(self.electrodes[0] + region_doping + 1),:,-region_doping:])
        
         
+        n1 = defects_at_electrodes/self.vol_electrode
+        n1 = n1 * nm3_to_cm3
+        
+        delta_n = max(n1-n,0)
+        
+        
+        # w in m --> change to cm: w*100 (cm)
+        doping_term = self.e_er * np.sqrt(self.w *100 * delta_n/(4*np.pi))
+        
+        bias_term = np.sqrt(self.e_er/(4*np.pi)) * (2*self.e_er*n * (self.phi_b0 + self.A*np.abs(V)))**(1/4)
+
+        phi_b = self.phi_b0 - doping_term + bias_term
+        
+        
+        """
+            IN CURRENT DENSITY (1 - np.exp(-abs(V)/self.kb_T)) SHOULD IT BE ABSOLUTE VALUE????
+            Not corret --> I need to include SBH1 + SBH2 + resistance of the channel (MoS2)
+            Two Schottky barriers: Metal to MoS2 + MoS2 + MoS2 to metal
+            
+            Coupled equations, with a voltage drop in the two contacts and the channel
+            
+            Self-regulated by the rectifying behavior of the SBH
+            
+            Zhou, Hangbo, Viacheslav Sorkin, Shuai Chen, ZhiGen Yu, Kah‐Wee Ang, and Yong‐Wei Zhang. 
+            "Design‐Dependent Switching Mechanisms of Schottky‐Barrier‐Modulated Memristors based on 2D Semiconductor." 
+            Advanced Electronic Materials (2023): 2201252.
+        """
+        current_density = self.A0 * self.T**2 * np.exp(- phi_b / (self.kb_T)) * (1 - np.exp(-abs(V)/self.kb_T))
 
         
+        current = current_density * self.cross_sectional_area
+        #print(phi_b,doping_term,bias_term,current)
+
+        
+        return current
+    
+    def Schottky_current(self,V):
+        
+        field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-4:])
+        field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-4:])
+
+        
+        # Due to the electric field produce by the doping and the bias
+        image_force_lowering_1 = np.sqrt(self.e_er * abs(field_interface_1) / (4 * np.pi))
+        image_force_lowering_2 = np.sqrt(self.e_er * abs(field_interface_2) / (4 * np.pi))
+
+        phi_b1 = self.phi_b0 - image_force_lowering_1
+        exp_phi1 = np.exp(phi_b1/self.kb_T)
+
+        phi_b2 = self.phi_b0 - image_force_lowering_2
+        exp_phi2 = np.exp(phi_b2/self.kb_T)
+        
+        """
+        Bisection method to solve the non-linear equation
+        Device structure: 
+            SBH1 -> Metal-TMDC
+            Channel resistance
+            SBH2 -> TMDC-Metal
+            
+        Forward bias -> SBH2 -> TMDC-Metal dominates the total resistance
+        Reverse bias -> SBH1 -> Metal-TMDC dominates the total resistance
+        """
+        I0 = self.cross_sectional_area * self.A0 * self.T**2 
+        Vt = self.ideality_factor * self.kb_T
+        
+        Imin = 0
+
+        if V>0:
+            I1 = I0 * (1/exp_phi1) * (np.exp(V/Vt) - 1)
+            I2 = -I0 * (1/exp_phi2) * (np.exp(-V/Vt) - 1)
+            I3 = V/self.R
+            Imax = min(I1, I2, I3) 
+            fmax = Vt * np.log((Imax/I0) * exp_phi1 + 1) - Vt * np.log(1 - (Imax/I0) * exp_phi2) + Imax*self.R - V
+
+        else:
+            I1 = -I0 * (1/exp_phi1) * (np.exp(-V/Vt) - 1)
+            I2 = I0 * (1/exp_phi2) * (np.exp(V/Vt) - 1)
+            I3 = V/self.R
+            Imax = max(I1, I2, I3) 
+            fmax = -Vt * np.log((-Imax/I0) * exp_phi1 + 1) + Vt * np.log(1 + (Imax/I0) * exp_phi2) + Imax*self.R - V
+
+        I = (Imax + Imin)/2
+        f = 1
+        
+        while abs(f) >= self.tol:
+            
+            if V > 0:
+                f = Vt * np.log((I/I0) * exp_phi1 + 1) - Vt * np.log(1 - (I/I0) * exp_phi2) + I*self.R - V
+            else:
+                f = -Vt * np.log(1 - (I/I0) * exp_phi1) + Vt * np.log(1 + (I/I0) * exp_phi2) + I*self.R - V
+            
+            if fmax > 0:
+                if f > 0:
+                    Imax = I
+                elif f < 0:
+                    Imin = I
+                else:
+                    break
+        
+            else:
+                if f < 0:
+                    Imax = I
+                elif f > 0:
+                    Imin = I
+                else:
+                    break
+        
+            I = (Imax + Imin)/2
+        
+        return I
+
     

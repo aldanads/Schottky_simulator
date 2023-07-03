@@ -10,10 +10,11 @@ import numpy as np
 class Defects():
     
     
-    def __init__(self,coord_xyz,Act_energy,Grid_states):
+    def __init__(self,coord_xyz,Act_energy,Grid_states,q):
         
         self.coord_xyz = coord_xyz
         self.Act_energy = Act_energy
+        self.q = q
         self.length_x = len(Grid_states)-1
         self.length_y = len(Grid_states[0])-1
         self.length_z = len(Grid_states[0][0])-1
@@ -50,7 +51,7 @@ class Defects():
             List_neighbors[3] = (i,j-1,k)
             
         #Check up and down
-        if (k == self.length_z) or (Grid_states[i,j,k+1] == 1):
+        if (k >= self.length_z-1) or (Grid_states[i,j,k+1] == 1):
             List_neighbors[4] = (i,j,k+1)
             
         if (k == 0) or (Grid_states[i,j,k-1] == 1):
@@ -68,9 +69,12 @@ class Defects():
         energy_modulation = 0
         if Ex is not None:
             # Energy modulation by the electric field - These indexes match Act_energy indexes
+
             energy_modulation = np.array([Ex[i,j,k]*steps[0],-Ex[i,j,k]*steps[0],
                                  Ey[i,j,k]*steps[1],-Ey[i,j,k]*steps[1],
                                  Ez[i,j,k]*steps[2],-Ez[i,j,k]*steps[1]])*1e-9
+            
+
             
         
         available_idx = [i for i, item in enumerate(self.List_neighbors) if not isinstance(item, tuple)]
@@ -79,8 +83,8 @@ class Defects():
         kb = 8.6173324E-5 # Boltzmann constant
         nu0=7E13;  # nu0 (s^-1) bond vibration frequency
         T = 300
-        Energy_mod = (np.array(self.Act_energy)-energy_modulation)
-        Energy_mod[Energy_mod < 0.1] = 0.1
+        Energy_mod = (np.array(self.Act_energy) - self.q * energy_modulation)
+        Energy_mod[Energy_mod < 0.6] = 0.6
 
         TR[available_idx] = nu0*np.exp(-Energy_mod[available_idx]/(kb*T))
       

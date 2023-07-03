@@ -8,7 +8,7 @@ import numpy as np
 from balanced_tree import Node, build_tree, update_data, search_value
 
 
-def KMC(MoS2_layer,rng,defects_list):
+def KMC(MoS2_layer,rng,defects_list,V):
     
     
     TR_list = [] # Catalog of  non-zero transition rates in the system
@@ -28,15 +28,15 @@ def KMC(MoS2_layer,rng,defects_list):
     chosen_event,time = choose_event(TR_list,rng) # Choose an event and time step
     
     Vs = defects_list[chosen_event[2]]  # Get the defect corresponding to the chosen event
-    
-    if time > 1: 
-        time = 1
+
+    if time + MoS2_layer.time[-1] > V.tmax: 
+        time = V.tmax - MoS2_layer.time[-1]
         P = 1 - np.exp(-chosen_event[0]*time)
     
         if (rng.random() < P):
             Vs.processes(chosen_event[1], MoS2_layer)  # Apply the chosen event to the system
     
-            MoS2_layer.time_event_track(time, chosen_event[1])  # Update time and event count
+        MoS2_layer.time_event_track(time, chosen_event[1])  # Update time and event count
             
     else:
         Vs.processes(chosen_event[1], MoS2_layer)  # Apply the chosen event to the system
