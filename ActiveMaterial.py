@@ -119,11 +119,21 @@ class ActiveMaterial():
         #Track events
         self.events[chosen_event] += 1
         
+    """
+    --------------------- Plot the graphs ---------------------
+    """
         
-    def plot_particles(self):
+    def plot_particles(self,V,current):
         
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        
+        nr = 4
+        nc = 4
+        
+        #ax = plt.subplot2grid(shape=(nr, nc), loc=(0, 0), rowspan=1, colspan=1)
+        ax = plt.subplot2grid(shape=(nr, nc), loc=(0, 0), rowspan=2, colspan=3, projection='3d')
+
+        #ax = fig.add_subplot(111, projection='3d')
 
         x,y,z =  np.nonzero(self.Grid_states)
         x = x * self.steps[0]
@@ -140,9 +150,9 @@ class ActiveMaterial():
         ax.set_ylim(0, y_lim)
         ax.set_zlim(0, z_lim)
         
-        ax.set_xlabel('x-axis (nm)')
-        ax.set_ylabel('y-axis (nm)')
-        ax.set_zlabel('z-axis (nm)')
+        #ax.set_xlabel('x-axis (nm)')
+        #ax.set_ylabel('y-axis (nm)')
+        #ax.set_zlabel('z-axis (nm)')
         
         
         """
@@ -169,7 +179,39 @@ class ActiveMaterial():
     
             # Add the collection to the plot
             ax.add_collection3d(poly3d)
+            
+        # I-V curve plot
+        ax1 = plt.subplot2grid(shape=(nr, nc), loc=(0, 3), rowspan=1, colspan=1)
+        ax1.plot(V.voltage,abs(np.array(current)))
+        ax1.set_ylim(1e-11,1e-3)
+        ax1.set_xlabel('Voltage (V)', color ='black')
+        ax1.set_ylabel('Current (A)', color='black')
+        #ax1.set_ylabel('Current (μA)', color='black')
+
+        ax1.set_yscale('log')
         
+        
+        ax2 = plt.subplot2grid(shape=(nr, nc), loc=(2, 0), rowspan=2, colspan=3, projection='3d')
+        stride = 6 # Adjust the stride value as needed
+        scale_factor = 1.5  # Adjust the scale factor as needed
+        m_to_nm = 1e-9
+        x,y,z = np.mgrid[self.steps[0]:self.device_size[0]:self.steps[0] * stride,
+                            self.steps[1]:self.device_size[1]:self.steps[1] * stride,
+                            self.steps[2]:self.device_size[2]:self.steps[2] * stride]
+        
+        ax2.quiver3D(x, y, z, 
+                    self.Ex[::stride,::stride,::stride] * m_to_nm, 
+                    self.Ey[::stride,::stride,::stride] * m_to_nm, 
+                    self.Ez[::stride,::stride,::stride] * m_to_nm, 
+                    length=scale_factor)
+        
+        
+        ax2.set_xlabel('x axis (nm)', color ='black')
+        ax2.set_ylabel('y axis (nm)', color='black')
+        ax2.set_zlabel('z axis (nm)', color='black')
+
+
+
         
         plt.show()
         
@@ -289,9 +331,13 @@ class ActiveMaterial():
     def corners(self,u):
         
         u[0,0,1:-1] = 0.5 * (u[0,1,1:-1] + u[1,0,1:-1])
-        u[0,-1,1:-1] = 0.5 * (u[0,-2,1:-1] - u[1,-1,1:-1])
-        u[-1,0,1:-1] = 0.5 * (u[-1,1,1:-1] - u[-2,0,1:-1])
-        u[-1,-1,1:-1] = 0.5 * (u[-1,-2,1:-1] - u[-2,-1,1:-1])
+        u[0,-1,1:-1] = 0.5 * (u[0,-2,1:-1] + u[1,-1,1:-1])
+        u[-1,0,1:-1] = 0.5 * (u[-1,1,1:-1] + u[-2,0,1:-1])
+        u[-1,-1,1:-1] = 0.5 * (u[-1,-2,1:-1] + u[-2,-1,1:-1])
+        
+        u[self.electrodes[0]:self.electrodes[1],0,-1] = 0.5 * (u[self.electrodes[0]:self.electrodes[1],0,-2] + u[self.electrodes[0]:self.electrodes[1],1,-1])
+        u[self.electrodes[0]:self.electrodes[1],-1,-1] = 0.5 * (u[self.electrodes[0]:self.electrodes[1],-1,-2] + u[self.electrodes[0]:self.electrodes[1],-2,-1])
+
         
         return u
 
@@ -300,9 +346,15 @@ class ActiveMaterial():
         # Introduce the steps in m
         Ex, Ey, Ez = np.gradient(self.u,self.steps[0]*1e-9,self.steps[1]*1e-9,self.steps[2]*1e-9)
         
+        depletion_region_field = -7E7 #(V/m)
+
         self.Ex = -self.local_field(Ex)
         self.Ey = -self.local_field(Ey)
         self.Ez = -self.local_field(Ez)
+        
+        self.Ez[:self.electrodes[0],:,-4:] = self.Ez[:self.electrodes[0],:,-4:] + depletion_region_field
+        self.Ez[self.electrodes[1]:,:,-4:] = self.Ez[self.electrodes[1]:,:,-4:] + depletion_region_field
+        
         
     def local_field(self,E_field):
         
@@ -423,19 +475,35 @@ class ActiveMaterial():
     
     def Schottky_current(self,V):
         
-        field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-4:])
-        field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-4:])
+        
+        #depletion_region_field = -7E7 #(V/m)
 
+        field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-4:]) # + depletion_region_field
+        field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-4:]) # + depletion_region_field
         
         # Due to the electric field produce by the doping and the bias
         image_force_lowering_1 = np.sqrt(self.e_er * abs(field_interface_1) / (4 * np.pi))
         image_force_lowering_2 = np.sqrt(self.e_er * abs(field_interface_2) / (4 * np.pi))
 
+        """
+        
+        print(f'field (V/m): {field_interface_1:.4e}')
+        print(f'field (V/m): {field_interface_2:.4e}')
+        
+        
+        if V > 0:
+            phi_b1 = self.phi_b0 - image_force_lowering_1
+            phi_b2 = self.phi_b0 - image_force_lowering_2
+        else:
+        """    
+        
         phi_b1 = self.phi_b0 - image_force_lowering_1
-        exp_phi1 = np.exp(phi_b1/self.kb_T)
-
         phi_b2 = self.phi_b0 - image_force_lowering_2
+            
+        exp_phi1 = np.exp(phi_b1/self.kb_T)
         exp_phi2 = np.exp(phi_b2/self.kb_T)
+        
+        print(phi_b1,phi_b2)
         
         """
         Bisection method to solve the non-linear equation
@@ -453,18 +521,20 @@ class ActiveMaterial():
         Imin = 0
 
         if V>0:
-            I1 = I0 * (1/exp_phi1) * (np.exp(V/Vt) - 1)
-            I2 = -I0 * (1/exp_phi2) * (np.exp(-V/Vt) - 1)
-            I3 = V/self.R
-            Imax = min(I1, I2, I3) 
-            fmax = Vt * np.log((Imax/I0) * exp_phi1 + 1) - Vt * np.log(1 - (Imax/I0) * exp_phi2) + Imax*self.R - V
-
-        else:
             I1 = -I0 * (1/exp_phi1) * (np.exp(-V/Vt) - 1)
             I2 = I0 * (1/exp_phi2) * (np.exp(V/Vt) - 1)
             I3 = V/self.R
+            Imax = min(I1, I2, I3) 
+            #fmax = Vt * np.log((Imax/I0) * exp_phi1 + 1) - Vt * np.log(1 - (Imax/I0) * exp_phi2) + Imax*self.R - V
+            fmax = Vt * np.log((Imax/I0) * exp_phi2 + 1) - Vt * np.log(1 - (Imax/I0) * exp_phi1) + Imax*self.R - V
+
+        else:
+            I1 = I0 * (1/exp_phi1) * (np.exp(V/Vt) - 1)
+            I2 = -I0 * (1/exp_phi2) * (np.exp(-V/Vt) - 1)
+            I3 = V/self.R
             Imax = max(I1, I2, I3) 
-            fmax = -Vt * np.log((-Imax/I0) * exp_phi1 + 1) + Vt * np.log(1 + (Imax/I0) * exp_phi2) + Imax*self.R - V
+            #fmax = -Vt * np.log((-Imax/I0) * exp_phi1 + 1) + Vt * np.log(1 + (Imax/I0) * exp_phi2) + Imax*self.R - V
+            fmax = -Vt * np.log((-Imax/I0) * exp_phi2 + 1) + Vt * np.log(1 + (Imax/I0) * exp_phi1) + Imax*self.R - V
 
         I = (Imax + Imin)/2
         f = 1
@@ -472,9 +542,12 @@ class ActiveMaterial():
         while abs(f) >= self.tol:
             
             if V > 0:
-                f = Vt * np.log((I/I0) * exp_phi1 + 1) - Vt * np.log(1 - (I/I0) * exp_phi2) + I*self.R - V
+                #f = Vt * np.log((I/I0) * exp_phi1 + 1) - Vt * np.log(1 - (I/I0) * exp_phi2) + I*self.R - V
+                f = Vt * np.log((I/I0) * exp_phi2 + 1) - Vt * np.log(1 - (I/I0) * exp_phi1) + I*self.R - V
             else:
-                f = -Vt * np.log(1 - (I/I0) * exp_phi1) + Vt * np.log(1 + (I/I0) * exp_phi2) + I*self.R - V
+                #f = -Vt * np.log(1 - (I/I0) * exp_phi1) + Vt * np.log(1 + (I/I0) * exp_phi2) + I*self.R - V
+                f = -Vt * np.log(1 - (I/I0) * exp_phi2) + Vt * np.log(1 + (I/I0) * exp_phi1) + I*self.R - V
+
             
             if fmax > 0:
                 if f > 0:

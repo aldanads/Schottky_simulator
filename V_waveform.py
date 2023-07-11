@@ -9,7 +9,7 @@ import numpy as np
 
 class V_waveform():
     
-    def __init__(self,shape_phase,MaxV,wave_width,delta_t,V_forming,t_forming):
+    def __init__(self,shape_phase,MaxV,wave_width,delta_t,V_forming,t_forming,n_cycles):
         
         self.shape = shape_phase[0]
         self.shape_phase = shape_phase
@@ -20,6 +20,8 @@ class V_waveform():
         self.delta_t = delta_t # sampling time (s)
         self.voltage = []
         self.tmax = 0
+        self.cycles = 0
+        self.n_cycles = n_cycles
         
     def update_V(self,t):
         
@@ -49,6 +51,9 @@ class V_waveform():
             V = -dVdt * q_phase
         elif quadrant == 3:
             V = - MaxV + (dVdt * q_phase)
+            
+        if phase == 0:
+            self.cycles += 1
             
         self.voltage.append(V)
         

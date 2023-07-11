@@ -64,8 +64,8 @@ def initialization(n_sim,save_data):
 
     """
     er = 21 # Relative permitivity
-    screening = 0.05 # Screening of electric field
-    q = -2 # Particle charge
+    screening = 0.08 # Screening of electric field
+    q = 2 # Particle charge
     
     """
      Electrodes properties
@@ -79,7 +79,7 @@ def initialization(n_sim,save_data):
     #     # Activation energies 
     # =============================================================================
     """
-    E_diffusion = 1.1
+    E_diffusion = 1
     
     # Defects can migrate up-down, lateral x-axis and y-axis
     Act_energy = [E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion]
@@ -92,6 +92,11 @@ def initialization(n_sim,save_data):
      "Multi-terminal memtransistors from polycrystalline monolayer molybdenum disulfide." Nature 554, no. 7693 (2018): 500-504.
      Sangwan says that phi_bn (effective Schottky barrier) range between 80–125 meV in experiments
      They use 20 meV to 280 meV in simulations
+     
+     Zhou, Hangbo, Viacheslav Sorkin, Shuai Chen, ZhiGen Yu, Kah‐Wee Ang, and Yong‐Wei Zhang. 
+     "Design‐Dependent Switching Mechanisms of Schottky‐Barrier‐Modulated Memristors based on 2D Semiconductor." 
+     Advanced Electronic Materials (2023): 2201252.
+     Schottky barrier between 0.57-0.82 eV
      """
     phi_b0 = 0.385 # Schottky barrier (eV) not modulated  (fitting parameter)
     w = 3E-9 # w (nm) is in the range of a few nanometers --> region with excess of dopants (fitting parameter)
@@ -111,12 +116,13 @@ def initialization(n_sim,save_data):
     
     # Voltage waveform
     shape_phase = ['forming','triangle']
-    MaxV = -1 
-    wave_width = 4
+    MaxV = -1.5 
+    wave_width = 5
     delta_t = 0.1 # Sampling time
     V_forming = 3
     t_forming = 3
-    V = V_waveform(shape_phase,MaxV,wave_width,delta_t,V_forming,t_forming)
+    n_cycles = 2
+    V = V_waveform(shape_phase,MaxV,wave_width,delta_t,V_forming,t_forming,n_cycles)
     
     MoS2_layer = ActiveMaterial(Act_energy,device_size,steps,time,er,screening,electrodes,q,T,schottky_parameters,square_size)
 
