@@ -24,7 +24,7 @@ def initialization(n_sim,save_data):
     plt.rcParams["figure.dpi"] = 300 # Default value of dpi = 300
     
     if save_data:
-        files_copy = ['defects.py', 'hex_lattice.py', 'initialization.py','KMC.py','main_simulator.py','load_variables.py']
+        files_copy = ['ActiveMaterial.py', 'balanced_tree.py','defects.py', 'initialization.py','KMC.py','main_simulator.py','V_waveform.py','load_variables.py']
         
         if platform.system() == 'Windows': # When running in laptop
             dst = r'C:\Users\aldanads\OneDrive - Trinity College Dublin\2D device simulator project\Publications\Schottky barrier\Simulations\Testing\\'
@@ -64,7 +64,7 @@ def initialization(n_sim,save_data):
 
     """
     er = 21 # Relative permitivity
-    screening = 0.08 # Screening of electric field
+    screening = 0.5 # Screening of electric field
     q = 2 # Particle charge
     
     """
@@ -82,7 +82,7 @@ def initialization(n_sim,save_data):
     E_diffusion = 1
     
     # Defects can migrate up-down, lateral x-axis and y-axis
-    Act_energy = [E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion]
+    Act_energy = [E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion+1.3,E_diffusion+1.3]
     
     # Temperature in kelvin (k)
     T = 300
@@ -98,16 +98,16 @@ def initialization(n_sim,save_data):
      Advanced Electronic Materials (2023): 2201252.
      Schottky barrier between 0.57-0.82 eV
      """
-    phi_b0 = 0.385 # Schottky barrier (eV) not modulated  (fitting parameter)
+    phi_b0 = 0.31 # Schottky barrier (eV) not modulated  (fitting parameter)
     w = 3E-9 # w (nm) is in the range of a few nanometers --> region with excess of dopants (fitting parameter)
     A = 10E-5 # A constant
     R = 5000
     ideality_factor = 10
-    tol = 1e-8
+    tol = 1e-4
     
     square_size = 4
     # Introducing defects in the active layer
-    n_defects = 50
+    n_defects = 15
     n = n_defects/np.product(device_size) # Density of defects in the structure
 
     
@@ -141,14 +141,14 @@ def save_simulation(files_copy,dst,n_sim):
         os.makedirs(dst+parent_dir) 
         dst = dst+parent_dir
         program_directory = 'Program\\'
-        data_directoy = 'Crystal growth\\'
+        data_directoy = 'Evolution\\'
         
     elif platform.system() == 'Linux':
         parent_dir = 'Sim_'+str(n_sim)+'/'
         os.makedirs(dst+parent_dir) 
         dst = dst+parent_dir
         program_directory = 'Program/'
-        data_directoy = 'Crystal growth/'
+        data_directoy = 'Evolution/'
 
     os.makedirs(dst + program_directory)
     os.makedirs(dst + data_directoy)

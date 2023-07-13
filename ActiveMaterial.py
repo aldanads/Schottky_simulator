@@ -39,8 +39,8 @@ class ActiveMaterial():
         # Electrical parameters
         # Change to cm --> F/m = C / (V * m) = C / (100 * V * cm)
         e0 = 8.854187817E-12  # Permittivity of free space F/m = C / (V * m) = (C^2 / (N*cm^2))
-        e_charge = 1.60217663E-19 # Electron charge (C)
-        self.e_er = e_charge/(self.er*e0)
+        self.e_charge = 1.60217663E-19 # Electron charge (C)
+        self.e_er = self.e_charge/(self.er*e0)
         self.A0 = 1.202E6 # Richardson constant (A*(m^-2)*(K^-2))
         kb=8.6173324E-5  # Boltzmann constant (eV/K)
         self.kb_T = kb * T
@@ -100,12 +100,13 @@ class ActiveMaterial():
         x_axis_paralallel = [np.array([6,6,6]),np.array([5,6,6])] 
         y_axis_paralallel = [np.array([6,6,6]),np.array([6,5,6])]
         z_axis_paralallel = [np.array([6,6,6]),np.array([6,6,5])]
-        single_particle = [np.array([6,6,6])]
+        #single_particle = [np.array([1,15,29]),np.array([1,14,29]),np.array([1,13,29])]
+        single_particle = [np.array([1,15,29]),np.array([1,14,29]),np.array([1,13,29]),np.array([1,16,29]),np.array([1,17,29])]
         
         test_defects = [x_axis_paralallel,y_axis_paralallel,z_axis_paralallel,single_particle]
         
         for Vs in test_defects[3]:
-            defects_list.append(Defects(Vs, self.Act_energy, self.Grid_states))
+            defects_list.append(Defects(Vs, self.Act_energy, self.Grid_states,self.q))
             self.Grid_states[tuple(Vs)] = 1
         
         return defects_list
@@ -123,10 +124,8 @@ class ActiveMaterial():
     --------------------- Plot the graphs ---------------------
     """
         
-    def plot_particles(self,V,current):
-        
-        fig = plt.figure()
-        
+    def plot_particles(self,V,current,path,i,t):
+                
         nr = 4
         nc = 4
         
@@ -211,9 +210,11 @@ class ActiveMaterial():
         ax2.set_zlabel('z axis (nm)', color='black')
 
 
-
-        
-        plt.show()
+        if path == '':
+            plt.show()
+        else:
+            plt.savefig(path+str(i)+'_t(s) = '+str(round(t,5))+' .png', dpi = 300)
+            plt.clf()
         
         
         
@@ -346,14 +347,30 @@ class ActiveMaterial():
         # Introduce the steps in m
         Ex, Ey, Ez = np.gradient(self.u,self.steps[0]*1e-9,self.steps[1]*1e-9,self.steps[2]*1e-9)
         
-        depletion_region_field = -7E7 #(V/m)
-
+        
+        """
+        ------------------- Depletion region --------------------------------
+        """
+        # Positive pointing to the electrodes (z direction)
+        # Make more difficult for the electron to cross the barrier
+        ND = 1E18
+        phi_bi = 0.4
+        max_field = 100 * np.sqrt(2*self.e_er*100 * ND * phi_bi) #(V/m)
+        WD = np.sqrt(2 * (phi_bi - self.kb_T)/(100 * self.e_er * ND)) *1e7
+        
+        x = np.linspace(self.steps[2],self.device_size[2],self.Grid_states.shape[2])
+        
+        depletion_region_field = max_field - x * max_field /WD
+        """
+        --------------------------------------------------------------------
+        """
+         
         self.Ex = -self.local_field(Ex)
         self.Ey = -self.local_field(Ey)
         self.Ez = -self.local_field(Ez)
         
-        self.Ez[:self.electrodes[0],:,-4:] = self.Ez[:self.electrodes[0],:,-4:] + depletion_region_field
-        self.Ez[self.electrodes[1]:,:,-4:] = self.Ez[self.electrodes[1]:,:,-4:] + depletion_region_field
+        self.Ez[:self.electrodes[0],:,:] = self.Ez[:self.electrodes[0],:,:] + depletion_region_field[::-1]
+        self.Ez[self.electrodes[1]:,:,:] = self.Ez[self.electrodes[1]:,:,:] + depletion_region_field[::-1]
         
         
     def local_field(self,E_field):
@@ -476,26 +493,26 @@ class ActiveMaterial():
     def Schottky_current(self,V):
         
         
-        #depletion_region_field = -7E7 #(V/m)
+        field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-4:],(0,1)) # Average the plane xy
+        field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-4:],(0,1)) # Average the plane xy
+        
+        #x = np.linspace(self.steps[2],self.device_size[2],self.Grid_states.shape[2])
 
-        field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-4:]) # + depletion_region_field
-        field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-4:]) # + depletion_region_field
+        #PE_1 = np.argmax(- self.e_er * self.e_charge / (16*np.pi * x * 1e-9) - self.e_charge * x * 1e-9 * abs(field_interface_1[::-1]))
+        #PE_2 = np.argmax(- self.e_er * self.e_charge / (16*np.pi * x * 1e-9) - self.e_charge * x * 1e-9 * abs(field_interface_2[::-1]))
         
         # Due to the electric field produce by the doping and the bias
-        image_force_lowering_1 = np.sqrt(self.e_er * abs(field_interface_1) / (4 * np.pi))
-        image_force_lowering_2 = np.sqrt(self.e_er * abs(field_interface_2) / (4 * np.pi))
+        image_force_lowering_1 = np.sqrt(self.e_er * max(abs(field_interface_1)) / (4 * np.pi))
+        image_force_lowering_2 = np.sqrt(self.e_er * max(abs(field_interface_2)) / (4 * np.pi))
+        
+        #print(max(image_force_lowering_1),max(image_force_lowering_2))
 
-        """
+        #print(f'field (V/m): {field_interface_1:.4e}')
+        #print(f'field (V/m): {field_interface_2:.4e}')
+  
         
-        print(f'field (V/m): {field_interface_1:.4e}')
-        print(f'field (V/m): {field_interface_2:.4e}')
-        
-        
-        if V > 0:
-            phi_b1 = self.phi_b0 - image_force_lowering_1
-            phi_b2 = self.phi_b0 - image_force_lowering_2
-        else:
-        """    
+        # phi_b1 = self.phi_b0 - max(image_force_lowering_1)
+        # phi_b2 = self.phi_b0 - max(image_force_lowering_2)
         
         phi_b1 = self.phi_b0 - image_force_lowering_1
         phi_b2 = self.phi_b0 - image_force_lowering_2
@@ -516,8 +533,27 @@ class ActiveMaterial():
         Reverse bias -> SBH1 -> Metal-TMDC dominates the total resistance
         """
         I0 = self.cross_sectional_area * self.A0 * self.T**2 
-        Vt = self.ideality_factor * self.kb_T
+
+        """
+        # Ideality factor changes depending on the voltage
+        if abs(V) <= 0.8:
+            self.ideality_factor += 1
+        elif abs(V) > 0.7 and abs(V) < 1.1:
+            self.ideality_factor = 2
+        elif abs(V) > 1.1 and abs(V) < 1.3:
+            self.ideality_factor = 3
+        elif abs(V) > 1.3 and abs(V) < 1.7:
+            self.ideality_factor = 4
+        elif abs(V) > 1.7 and abs(V) < 2.2:
+            self.ideality_factor = 5
+        elif abs(V) > 2.2 and abs(V) < 2.6:
+            self.ideality_factor = 6
+        elif abs(V) > 2.6:
+            self.ideality_factor = 7            
+        """
         
+        Vt = self.ideality_factor * self.kb_T
+
         Imin = 0
 
         if V>0:
@@ -547,7 +583,6 @@ class ActiveMaterial():
             else:
                 #f = -Vt * np.log(1 - (I/I0) * exp_phi1) + Vt * np.log(1 + (I/I0) * exp_phi2) + I*self.R - V
                 f = -Vt * np.log(1 - (I/I0) * exp_phi2) + Vt * np.log(1 + (I/I0) * exp_phi1) + I*self.R - V
-
             
             if fmax > 0:
                 if f > 0:
@@ -564,7 +599,7 @@ class ActiveMaterial():
                     Imin = I
                 else:
                     break
-        
+
             I = (Imax + Imin)/2
         
         return I

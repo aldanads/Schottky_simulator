@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 
 end = time.time()
 
-save_data = False
-save_var = False
+save_data = True
+save_var = True
 
 n_sim = 1
 MoS2_layer,paths,rng,defects_list,V = initialization(n_sim,save_data)
@@ -31,7 +31,7 @@ end = time.time()
 elapsed_time.append(end-start)
 
 current.append(MoS2_layer.Schottky_current(V.voltage[-1]))
-MoS2_layer.plot_particles(V,current)
+MoS2_layer.plot_particles(V,current,paths['data'],i,MoS2_layer.time[-1])
 
 
 
@@ -46,11 +46,18 @@ while V.cycles < V.n_cycles:
     V.update_V(MoS2_layer.time[-1])
     MoS2_layer.SolvePotentialAndField(V.voltage[-1])
     current.append(MoS2_layer.Schottky_current(V.voltage[-1]))
-    MoS2_layer.plot_particles(V,current)
+    MoS2_layer.plot_particles(V,current,paths['data'],i,MoS2_layer.time[-1])
 
     print(f'Voltage (V): {V.voltage[-1]:.2f}', f'Time (s): {MoS2_layer.time[-1]:.2f}',f'Current (A): {current[-1]:.4e}')
 
     end = time.time()
     elapsed_time.append(end-start)
+    
+# Variables to save
+variables = {'MoS2_layer': MoS2_layer, 
+           'defects_list': defects_list,
+           'V':V}
+if save_var: save_variables(paths['program'],variables)
+
 
     
