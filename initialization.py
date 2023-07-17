@@ -27,7 +27,7 @@ def initialization(n_sim,save_data):
         files_copy = ['ActiveMaterial.py', 'balanced_tree.py','defects.py', 'initialization.py','KMC.py','main_simulator.py','V_waveform.py','load_variables.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'C:\Users\aldanads\OneDrive - Trinity College Dublin\2D device simulator project\Publications\Schottky barrier\Simulations\Testing\\'
+            dst = r'C:\Users\aldanads\OneDrive - Trinity College Dublin\2D device simulator project\Publications\Schottky barrier\Simulations\Testing\Potential max\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'/home/users/aldanads/Crystal growth/Simulations/Growth rate -  Diffusion rate/1.2eV/'
             
@@ -63,8 +63,8 @@ def initialization(n_sim,save_data):
          er = 11.5 for 5L under electric field
 
     """
-    er = 21 # Relative permitivity
-    screening = 0.5 # Screening of electric field
+    er = 22 # Relative permitivity
+    screening = 0.1 + 0.1*n_sim # Screening of electric field
     q = 2 # Particle charge
     
     """
@@ -79,10 +79,11 @@ def initialization(n_sim,save_data):
     #     # Activation energies 
     # =============================================================================
     """
-    E_diffusion = 1
+    E_diffusion = 0.9
+    E_lim = 0.79
     
     # Defects can migrate up-down, lateral x-axis and y-axis
-    Act_energy = [E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion+1.3,E_diffusion+1.3]
+    Act_energy = [E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion+1.3,E_diffusion+1.3,E_lim]
     
     # Temperature in kelvin (k)
     T = 300
@@ -117,11 +118,11 @@ def initialization(n_sim,save_data):
     # Voltage waveform
     shape_phase = ['forming','triangle']
     MaxV = -1.5 
-    wave_width = 5
+    wave_width = 4
     delta_t = 0.1 # Sampling time
     V_forming = 3
     t_forming = 3
-    n_cycles = 2
+    n_cycles = 1
     V = V_waveform(shape_phase,MaxV,wave_width,delta_t,V_forming,t_forming,n_cycles)
     
     MoS2_layer = ActiveMaterial(Act_energy,device_size,steps,time,er,screening,electrodes,q,T,schottky_parameters,square_size)

@@ -58,6 +58,26 @@ class ActiveMaterial():
         # Cross sectional area perpendicular to the current --> Area of the electrode (m**2)
         # The electrode are in nm scale
         self.cross_sectional_area =  device_size[1] * electrodes[0]*steps[0] *1e-18
+        
+        self.phi_b = [[],[]]
+        
+        
+        """
+        ------------------- Depletion region --------------------------------
+        """
+        # Positive pointing to the electrodes (z direction)
+        # Make more difficult for the electron to cross the barrier
+        ND = 1E16
+        phi_bi = 0.2
+        max_field = 100 * np.sqrt(2*self.e_er*100 * ND * phi_bi) #(V/m)
+        WD = np.sqrt(2 * (phi_bi - self.kb_T)/(100 * self.e_er * ND)) *1e7
+        
+        x = np.linspace(self.steps[2],self.device_size[2],self.Grid_states.shape[2])
+        
+        self.depletion_region_field = max_field - x * max_field /WD
+        """
+        --------------------------------------------------------------------
+        """
 
 
         
@@ -208,6 +228,19 @@ class ActiveMaterial():
         ax2.set_xlabel('x axis (nm)', color ='black')
         ax2.set_ylabel('y axis (nm)', color='black')
         ax2.set_zlabel('z axis (nm)', color='black')
+        
+        
+        ax3 = plt.subplot2grid(shape=(nr, nc), loc=(2, 3), rowspan=2, colspan=1)
+        ax3.plot(V.voltage,self.phi_b[0],color = 'blue',label = 'SBH_1')
+        ax3.plot(V.voltage,self.phi_b[1],color = 'red',label = 'SBH_2')
+        
+        ax3.set_xlabel('Voltage (V)', color ='black')
+        ax3.set_ylabel('SBH (eV)', color='black')
+        
+        ax3.legend(fontsize="5")
+
+
+
 
 
         if path == '':
@@ -347,30 +380,13 @@ class ActiveMaterial():
         # Introduce the steps in m
         Ex, Ey, Ez = np.gradient(self.u,self.steps[0]*1e-9,self.steps[1]*1e-9,self.steps[2]*1e-9)
         
-        
-        """
-        ------------------- Depletion region --------------------------------
-        """
-        # Positive pointing to the electrodes (z direction)
-        # Make more difficult for the electron to cross the barrier
-        ND = 1E18
-        phi_bi = 0.4
-        max_field = 100 * np.sqrt(2*self.e_er*100 * ND * phi_bi) #(V/m)
-        WD = np.sqrt(2 * (phi_bi - self.kb_T)/(100 * self.e_er * ND)) *1e7
-        
-        x = np.linspace(self.steps[2],self.device_size[2],self.Grid_states.shape[2])
-        
-        depletion_region_field = max_field - x * max_field /WD
-        """
-        --------------------------------------------------------------------
-        """
          
         self.Ex = -self.local_field(Ex)
         self.Ey = -self.local_field(Ey)
         self.Ez = -self.local_field(Ez)
         
-        self.Ez[:self.electrodes[0],:,:] = self.Ez[:self.electrodes[0],:,:] + depletion_region_field[::-1]
-        self.Ez[self.electrodes[1]:,:,:] = self.Ez[self.electrodes[1]:,:,:] + depletion_region_field[::-1]
+        self.Ez[:self.electrodes[0],:,:] = self.Ez[:self.electrodes[0],:,:] + self.depletion_region_field[::-1]
+        self.Ez[self.electrodes[1]:,:,:] = self.Ez[self.electrodes[1]:,:,:] + self.depletion_region_field[::-1]
         
         
     def local_field(self,E_field):
@@ -399,6 +415,13 @@ class ActiveMaterial():
         "Stark effect spectroscopy of mono-and few-layer MoS2." 
         Nano letters 16, no. 3 (2016): 1554-1559.
         p = 0.08 D = 0.0166552e-10 (em)
+        1 D ≈ 0.02081943 e·nm 
+        
+        Yang, Longlong, Xin Xie, Jingnan Yang, Mengfei Xue, Shiyao Wu, Shan Xiao, Feilong Song et al. 
+        "Strong light–matter interactions between gap plasmons and two-dimensional excitons under ambient conditions in a deterministic way." 
+        Nano Letters 22, no. 6 (2022): 2177-2186.
+        
+        p = 7.5 D
         """
         # Dipole moment --> (enm)    %p=40;
         # p=40;
@@ -492,27 +515,29 @@ class ActiveMaterial():
     
     def Schottky_current(self,V):
         
+        potential = True
+        if potential:
+            field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,:],(0,1)) # Average the plane xy
+            field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,:],(0,1)) # Average the plane xy
+            
+            x = np.linspace(self.steps[2],self.device_size[2],self.Grid_states.shape[2])
+    
+            PE_1 = np.argmax(- self.e_er * self.e_charge / (16*np.pi * x * 1e-9) - self.e_charge * x * 1e-9 * abs(field_interface_1[::-1]))
+            PE_2 = np.argmax(- self.e_er * self.e_charge / (16*np.pi * x * 1e-9) - self.e_charge * x * 1e-9 * abs(field_interface_2[::-1]))
+            
+            # Due to the electric field produce by the doping and the bias
+            image_force_lowering_1 = np.sqrt(self.e_er * abs(field_interface_1[PE_1]) / (4 * np.pi))
+            image_force_lowering_2 = np.sqrt(self.e_er * abs(field_interface_2[PE_2]) / (4 * np.pi))
         
-        field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-4:],(0,1)) # Average the plane xy
-        field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-4:],(0,1)) # Average the plane xy
+        else:
+            field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-6:],(0,1)) # Average the plane xy
+            field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-6:],(0,1)) # Average the plane xy
+            
+            
+            image_force_lowering_1 = np.sqrt(self.e_er * max(abs(field_interface_1)) / (4 * np.pi))
+            image_force_lowering_2 = np.sqrt(self.e_er * max(abs(field_interface_2)) / (4 * np.pi))
         
-        #x = np.linspace(self.steps[2],self.device_size[2],self.Grid_states.shape[2])
 
-        #PE_1 = np.argmax(- self.e_er * self.e_charge / (16*np.pi * x * 1e-9) - self.e_charge * x * 1e-9 * abs(field_interface_1[::-1]))
-        #PE_2 = np.argmax(- self.e_er * self.e_charge / (16*np.pi * x * 1e-9) - self.e_charge * x * 1e-9 * abs(field_interface_2[::-1]))
-        
-        # Due to the electric field produce by the doping and the bias
-        image_force_lowering_1 = np.sqrt(self.e_er * max(abs(field_interface_1)) / (4 * np.pi))
-        image_force_lowering_2 = np.sqrt(self.e_er * max(abs(field_interface_2)) / (4 * np.pi))
-        
-        #print(max(image_force_lowering_1),max(image_force_lowering_2))
-
-        #print(f'field (V/m): {field_interface_1:.4e}')
-        #print(f'field (V/m): {field_interface_2:.4e}')
-  
-        
-        # phi_b1 = self.phi_b0 - max(image_force_lowering_1)
-        # phi_b2 = self.phi_b0 - max(image_force_lowering_2)
         
         phi_b1 = self.phi_b0 - image_force_lowering_1
         phi_b2 = self.phi_b0 - image_force_lowering_2
@@ -520,7 +545,9 @@ class ActiveMaterial():
         exp_phi1 = np.exp(phi_b1/self.kb_T)
         exp_phi2 = np.exp(phi_b2/self.kb_T)
         
-        print(phi_b1,phi_b2)
+        
+        self.phi_b[0].append(phi_b1)
+        self.phi_b[1].append(phi_b2)
         
         """
         Bisection method to solve the non-linear equation

@@ -70,21 +70,28 @@ class Defects():
         if Ex is not None:
             # Energy modulation by the electric field - These indexes match Act_energy indexes
 
-            energy_modulation = np.array([Ex[i,j,k]*steps[0],-Ex[i,j,k]*steps[0],
-                                 Ey[i,j,k]*steps[1],-Ey[i,j,k]*steps[1],
-                                 Ez[i,j,k]*steps[2],-Ez[i,j,k]*steps[1]])*1e-9
+            """
+                energy_modulation = np.array([Ex[i,j,k]*steps[0],-Ex[i,j,k]*steps[0],
+                                     Ey[i,j,k]*steps[1],-Ey[i,j,k]*steps[1],
+                                     Ez[i,j,k]*steps[2],-Ez[i,j,k]*steps[1]])*1e-9
+                
+            """
             
-
+            #p = 7.5 * 0.02081943 *1e-9 # Molecular dipole moment, D = 0.02081943
+            p = 1.5652239456384507 * 1e-9
+            energy_modulation = np.array([Ex[i,j,k]*p,-Ex[i,j,k]*p,
+                         Ey[i,j,k]*p,-Ey[i,j,k]*p,
+                         Ez[i,j,k]*p,-Ez[i,j,k]*p])
             
         
         available_idx = [i for i, item in enumerate(self.List_neighbors) if not isinstance(item, tuple)]
-        TR = np.zeros(len(self.Act_energy))
+        TR = np.zeros(len(self.Act_energy[:6]))
         
         kb = 8.6173324E-5 # Boltzmann constant
         nu0=7E13;  # nu0 (s^-1) bond vibration frequency
         T = 300
-        Energy_mod = (np.array(self.Act_energy) - self.q * energy_modulation)
-        Energy_mod[Energy_mod < 0.6] = 0.6
+        Energy_mod = (np.array(self.Act_energy[:6]) - self.q * energy_modulation)
+        Energy_mod[Energy_mod < self.Act_energy[6]] = self.Act_energy[6]
 
         TR[available_idx] = nu0*np.exp(-Energy_mod[available_idx]/(kb*T))
       
