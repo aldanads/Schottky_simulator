@@ -28,6 +28,9 @@ class V_waveform():
         if self.shape == 'forming':
             self.forming(t)
             
+        elif self.shape == 'forming_triangle':
+            self.forming_triangle(t)
+            
         elif self.shape == 'triangle':
             self.triangle(t)
         
@@ -52,7 +55,8 @@ class V_waveform():
         elif quadrant == 3:
             V = - MaxV + (dVdt * q_phase)
             
-        if phase == 0:
+      
+        if phase == 0 or phase < 0.001:
             self.cycles += 1
             
         self.voltage.append(V)
@@ -68,6 +72,33 @@ class V_waveform():
             self.shape = self.shape_phase[1]
         
         self.voltage.append(t * dVdt)
+        
+        
+    def forming_triangle(self,t):
+                 
+        MaxV = self.V_forming
+        wave_width = self.t_forming
+        dVdt = (2*MaxV)/wave_width # Rate of change of voltage
+        
+        T = wave_width * 2 # Period of the voltage waveform
+            
+        phase = t % T
+        quadrant = np.floor((phase*4) / T)
+        q_phase = phase - (quadrant * (wave_width/2))
+        
+        if quadrant == 0:
+            V = q_phase * dVdt
+        elif quadrant == 1:
+            V = MaxV - (dVdt * q_phase)
+        elif quadrant == 2:
+            V = -dVdt * q_phase
+        elif quadrant == 3:
+            V = - MaxV + (dVdt * q_phase)
+                        
+        if t >= wave_width:
+            self.shape = self.shape_phase[1]
+        
+        self.voltage.append(V)
 
         
     def update_tmax(self,i):

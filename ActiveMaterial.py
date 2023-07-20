@@ -104,7 +104,7 @@ class ActiveMaterial():
         chosen_coordinates = set() # I want unique coordinates
 
         while len(defects_list) < n_defects:
-            Vs_ijk = rng.integers(0, grid_points, size=3)
+            Vs_ijk = rng.integers(1, np.array(grid_points)-2, size=3)
 
             if tuple(Vs_ijk) not in chosen_coordinates:
                 chosen_coordinates.add(tuple(Vs_ijk))
@@ -151,7 +151,7 @@ class ActiveMaterial():
         
         #ax = plt.subplot2grid(shape=(nr, nc), loc=(0, 0), rowspan=1, colspan=1)
         ax = plt.subplot2grid(shape=(nr, nc), loc=(0, 0), rowspan=2, colspan=3, projection='3d')
-
+        ax.title.set_text(f'Voltage (V): {V.voltage[-1]:.2f}, cycle = {V.cycles}')
         #ax = fig.add_subplot(111, projection='3d')
 
         x,y,z =  np.nonzero(self.Grid_states)
@@ -291,7 +291,6 @@ class ActiveMaterial():
                 u1 = u
 
             count = self.check_convergence(u,u2,tol,nx,ny,nz)
-            
         self.u = self.corners(u)
         
         self.Electric_field()
@@ -357,7 +356,11 @@ class ActiveMaterial():
         nonzero_u = u != 0
         
         diff = np.abs(u - u2)
-        diff[nonzero_u] /= u[nonzero_u]
+        
+        # There is a bug here --> Sometimes it doesn't converge
+        # diff seems okay, probably the problem raise from /u[non_zero_u]
+        diff[nonzero_u] /= u[nonzero_u] 
+
         count += np.sum(tol > diff)
         
         return 100 * count/total
@@ -515,7 +518,7 @@ class ActiveMaterial():
     
     def Schottky_current(self,V):
         
-        potential = True
+        potential = False
         if potential:
             field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,:],(0,1)) # Average the plane xy
             field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,:],(0,1)) # Average the plane xy
@@ -530,13 +533,14 @@ class ActiveMaterial():
             image_force_lowering_2 = np.sqrt(self.e_er * abs(field_interface_2[PE_2]) / (4 * np.pi))
         
         else:
-            field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-6:],(0,1)) # Average the plane xy
-            field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-6:],(0,1)) # Average the plane xy
+            field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-20:],(0,1)) # Average the plane xy
+            field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-20:],(0,1)) # Average the plane xy
             
             
             image_force_lowering_1 = np.sqrt(self.e_er * max(abs(field_interface_1)) / (4 * np.pi))
             image_force_lowering_2 = np.sqrt(self.e_er * max(abs(field_interface_2)) / (4 * np.pi))
-        
+            
+            print(max(abs(field_interface_1))*1e-9,max(abs(field_interface_2))*1e-9)
 
         
         phi_b1 = self.phi_b0 - image_force_lowering_1

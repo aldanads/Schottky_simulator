@@ -36,25 +36,25 @@ class Defects():
         
         # Checking if there is a particle or a domain boundary
         # Check lateral x-axis
-        if (i == self.length_x) or (Grid_states[i+1,j,k] == 1):
+        if (i == self.length_x-1) or (Grid_states[i+1,j,k] == 1):
             List_neighbors[0] = (i+1,j,k)
             
             
-        if (i == 0) or (Grid_states[i-1,j,k] == 1):
+        if (i == 1) or (Grid_states[i-1,j,k] == 1):
             List_neighbors[1] = (i-1,j,k)
             
         # Check lateral y-axis
-        if (j == self.length_y) or (Grid_states[i,j+1,k] == 1):
+        if (j == self.length_y-1) or (Grid_states[i,j+1,k] == 1):
             List_neighbors[2] = (i,j+1,k)
             
-        if (j == 0) or (Grid_states[i,j-1,k] == 1):
+        if (j == 1) or (Grid_states[i,j-1,k] == 1):
             List_neighbors[3] = (i,j-1,k)
             
         #Check up and down
         if (k >= self.length_z-1) or (Grid_states[i,j,k+1] == 1):
             List_neighbors[4] = (i,j,k+1)
             
-        if (k == 0) or (Grid_states[i,j,k-1] == 1):
+        if (k == 1) or (Grid_states[i,j,k-1] == 1):
             List_neighbors[5] = (i,j,k-1)
             
         self.List_neighbors = List_neighbors

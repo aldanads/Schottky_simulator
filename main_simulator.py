@@ -12,11 +12,11 @@ import matplotlib.pyplot as plt
 
 end = time.time()
 
-save_data = True
-save_var = True
+save_data = False
+save_var = False
 
 
-for n_sim in range(0,7):
+for n_sim in range(0,1):
     
     MoS2_layer,paths,rng,defects_list,V = initialization(n_sim,save_data)
     
@@ -37,7 +37,7 @@ for n_sim in range(0,7):
     
     
     
-    while V.cycles < V.n_cycles:
+    while V.cycles <= V.n_cycles:
         i += 1
         V.update_tmax(i)
         start = time.time()
