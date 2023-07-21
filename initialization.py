@@ -64,7 +64,7 @@ def initialization(n_sim,save_data):
 
     """
     er = 22 # Relative permitivity
-    screening = 0.5 # Screening of electric field
+    screening = 0.2 # Screening of electric field
     q = 2 # Particle charge
     
     """
@@ -103,7 +103,7 @@ def initialization(n_sim,save_data):
     w = 3E-9 # w (nm) is in the range of a few nanometers --> region with excess of dopants (fitting parameter)
     A = 10E-5 # A constant
     R = 5000
-    ideality_factor = 10
+    ideality_factor = 2
     tol = 1e-4
     
     square_size = 4

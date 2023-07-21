@@ -519,6 +519,10 @@ class ActiveMaterial():
     def Schottky_current(self,V):
         
         potential = False
+        methods = ['Newton_raphson','Bisection']
+        method_used = methods[0]
+        
+        
         if potential:
             field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,:],(0,1)) # Average the plane xy
             field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,:],(0,1)) # Average the plane xy
@@ -563,76 +567,94 @@ class ActiveMaterial():
         Forward bias -> SBH2 -> TMDC-Metal dominates the total resistance
         Reverse bias -> SBH1 -> Metal-TMDC dominates the total resistance
         """
+        
         I0 = self.cross_sectional_area * self.A0 * self.T**2 
-
-        """
-        # Ideality factor changes depending on the voltage
-        if abs(V) <= 0.8:
-            self.ideality_factor += 1
-        elif abs(V) > 0.7 and abs(V) < 1.1:
-            self.ideality_factor = 2
-        elif abs(V) > 1.1 and abs(V) < 1.3:
-            self.ideality_factor = 3
-        elif abs(V) > 1.3 and abs(V) < 1.7:
-            self.ideality_factor = 4
-        elif abs(V) > 1.7 and abs(V) < 2.2:
-            self.ideality_factor = 5
-        elif abs(V) > 2.2 and abs(V) < 2.6:
-            self.ideality_factor = 6
-        elif abs(V) > 2.6:
-            self.ideality_factor = 7            
-        """
-        
         Vt = self.ideality_factor * self.kb_T
-
-        Imin = 0
-
-        if V>0:
-            I1 = -I0 * (1/exp_phi1) * (np.exp(-V/Vt) - 1)
-            I2 = I0 * (1/exp_phi2) * (np.exp(V/Vt) - 1)
-            I3 = V/self.R
-            Imax = min(I1, I2, I3) 
-            #fmax = Vt * np.log((Imax/I0) * exp_phi1 + 1) - Vt * np.log(1 - (Imax/I0) * exp_phi2) + Imax*self.R - V
-            fmax = Vt * np.log((Imax/I0) * exp_phi2 + 1) - Vt * np.log(1 - (Imax/I0) * exp_phi1) + Imax*self.R - V
-
-        else:
-            I1 = I0 * (1/exp_phi1) * (np.exp(V/Vt) - 1)
-            I2 = -I0 * (1/exp_phi2) * (np.exp(-V/Vt) - 1)
-            I3 = V/self.R
-            Imax = max(I1, I2, I3) 
-            #fmax = -Vt * np.log((-Imax/I0) * exp_phi1 + 1) + Vt * np.log(1 + (Imax/I0) * exp_phi2) + Imax*self.R - V
-            fmax = -Vt * np.log((-Imax/I0) * exp_phi2 + 1) + Vt * np.log(1 + (Imax/I0) * exp_phi1) + Imax*self.R - V
-
-        I = (Imax + Imin)/2
         f = 1
-        
-        while abs(f) >= self.tol:
+
+
+        if method_used == methods[0]:
             
             if V > 0:
-                #f = Vt * np.log((I/I0) * exp_phi1 + 1) - Vt * np.log(1 - (I/I0) * exp_phi2) + I*self.R - V
-                f = Vt * np.log((I/I0) * exp_phi2 + 1) - Vt * np.log(1 - (I/I0) * exp_phi1) + I*self.R - V
-            else:
-                #f = -Vt * np.log(1 - (I/I0) * exp_phi1) + Vt * np.log(1 + (I/I0) * exp_phi2) + I*self.R - V
-                f = -Vt * np.log(1 - (I/I0) * exp_phi2) + Vt * np.log(1 + (I/I0) * exp_phi1) + I*self.R - V
-            
-            if fmax > 0:
-                if f > 0:
-                    Imax = I
-                elif f < 0:
-                    Imin = I
-                else:
-                    break
-        
-            else:
-                if f < 0:
-                    Imax = I
-                elif f > 0:
-                    Imin = I
-                else:
-                    break
+                I1 = -I0 * (1/exp_phi1) * (np.exp(-V/Vt) - 1)
+                I2 = I0 * (1/exp_phi2) * (np.exp(V/Vt) - 1)
+                I3 = V/self.R
+                I = min(I1,I2,I3)
 
+            else: 
+                I1 = I0 * (1/exp_phi1) * (np.exp(abs(V)/Vt) - 1)
+                I2 = -I0 * (1/exp_phi2) * (np.exp(-abs(V)/Vt) - 1)
+                I3 = abs(V)/self.R
+                I = min(I1,I2,I3)
+                
+            while (abs(f) >= self.tol):
+                    
+                if V > 0:
+                    f = Vt * np.log((I/I0) * exp_phi2 + 1) - Vt * np.log(1 - (I/I0) * exp_phi1) + I*self.R - V
+                    df = (Vt * exp_phi2) / (I * exp_phi2 + I0) + Vt * exp_phi1 / (I0 - I * exp_phi1) + self.R
+                else:
+                    f = -Vt * np.log(1 - (I/I0) * exp_phi2) + Vt * np.log(1 + (I/I0) * exp_phi1) + I*self.R - abs(V)
+                    df = (Vt * exp_phi2) / (I0 - I * exp_phi2) + Vt * exp_phi1 / (I0 + I * exp_phi1) + self.R
+
+                I=I-f/df
+
+
+        elif method_used == methods[1]:
+ 
+    
+            
+            Vt = self.ideality_factor * self.kb_T
+    
+            Imin = 0
+    
+            if V>0:
+                I1 = -I0 * (1/exp_phi1) * (np.exp(-V/Vt) - 1)
+                I2 = I0 * (1/exp_phi2) * (np.exp(V/Vt) - 1)
+                I3 = V/self.R
+                Imax = min(I1, I2, I3) 
+                #fmax = Vt * np.log((Imax/I0) * exp_phi1 + 1) - Vt * np.log(1 - (Imax/I0) * exp_phi2) + Imax*self.R - V
+                fmax = Vt * np.log((Imax/I0) * exp_phi2 + 1) - Vt * np.log(1 - (Imax/I0) * exp_phi1) + Imax*self.R - V
+    
+            else:
+                I1 = I0 * (1/exp_phi1) * (np.exp(V/Vt) - 1)
+                I2 = -I0 * (1/exp_phi2) * (np.exp(-V/Vt) - 1)
+                I3 = V/self.R
+                Imax = max(I1, I2, I3) 
+                #fmax = -Vt * np.log((-Imax/I0) * exp_phi1 + 1) + Vt * np.log(1 + (Imax/I0) * exp_phi2) + Imax*self.R - V
+                fmax = -Vt * np.log((-Imax/I0) * exp_phi2 + 1) + Vt * np.log(1 + (Imax/I0) * exp_phi1) + Imax*self.R - V
+    
             I = (Imax + Imin)/2
+            
+            while abs(f) >= self.tol:
+                
+                if V > 0:
+                    #f = Vt * np.log((I/I0) * exp_phi1 + 1) - Vt * np.log(1 - (I/I0) * exp_phi2) + I*self.R - V
+                    f = Vt * np.log((I/I0) * exp_phi2 + 1) - Vt * np.log(1 - (I/I0) * exp_phi1) + I*self.R - V
+                else:
+                    #f = -Vt * np.log(1 - (I/I0) * exp_phi1) + Vt * np.log(1 + (I/I0) * exp_phi2) + I*self.R - V
+                    f = -Vt * np.log(1 - (I/I0) * exp_phi2) + Vt * np.log(1 + (I/I0) * exp_phi1) + I*self.R - V
+                
+                if fmax > 0:
+                    if f > 0:
+                        Imax = I
+                    elif f < 0:
+                        Imin = I
+                    else:
+                        break
+            
+                else:
+                    if f < 0:
+                        Imax = I
+                    elif f > 0:
+                        Imin = I
+                    else:
+                        break
+    
+                I = (Imax + Imin)/2
         
-        return I
+        if V > 0:
+            return I
+        else:
+            return -I
 
     
