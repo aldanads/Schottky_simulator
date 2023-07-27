@@ -9,6 +9,7 @@ from defects import Defects
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from scipy.constants import elementary_charge as qe, epsilon_0 as e0
 
 
 
@@ -38,9 +39,7 @@ class ActiveMaterial():
         
         # Electrical parameters
         # Change to cm --> F/m = C / (V * m) = C / (100 * V * cm)
-        e0 = 8.854187817E-12  # Permittivity of free space F/m = C / (V * m) = (C^2 / (N*cm^2))
-        self.e_charge = 1.60217663E-19 # Electron charge (C)
-        self.e_er = self.e_charge/(self.er*e0)
+        self.e_er = qe/(self.er*e0)
         self.A0 = 1.202E6 # Richardson constant (A*(m^-2)*(K^-2))
         kb=8.6173324E-5  # Boltzmann constant (eV/K)
         self.kb_T = kb * T
@@ -310,15 +309,16 @@ class ActiveMaterial():
     def charge_distribution(self):
         
         
-        qe=1.602176565e-19 # Charge of an electron (C)
-        e0=8.8541878176e-12 # Vacuum permittivity (F/m)
         vol = np.prod(self.steps) * (1E-9)
+        ro_charge = np.zeros(self.Grid_states.shape)
         
         scale_factor = self.steps[0]*self.steps[1]
-        density_particle = scale_factor* self.screening * self.q * qe / (vol*e0*self.er)
+        density_particle_screening = scale_factor* self.screening[0] * self.q * qe / (vol*e0*self.er)
+        density_particle = scale_factor* self.screening[1] * self.q * qe / (vol*e0*self.er)
         
-        
-        return self.Grid_states * density_particle
+        ro_charge = self.Grid_states * density_particle
+        ro_charge[self.electrodes[0]:self.electrodes[1],:,:] = self.Grid_states[self.electrodes[0]:self.electrodes[1],:,:] * density_particle_screening
+        return ro_charge
     
     def EcPoisson(self,u,u1,ro_charge):
         
@@ -487,18 +487,16 @@ class ActiveMaterial():
         
         
         # w in m --> change to cm: w*100 (cm)
-        doping_term = self.e_er * np.sqrt(self.w *100 * delta_n/(4*np.pi))
+        doping_term = self.e_er * 100 * np.sqrt(self.w *100 * delta_n/(4*np.pi))
         
-        bias_term = np.sqrt(self.e_er/(4*np.pi)) * (2*self.e_er*n * (self.phi_b0 + self.A*np.abs(V)))**(1/4)
+        bias_term = np.sqrt(self.e_er * 100/(4*np.pi)) * (2*self.e_er* 100 * n * (self.phi_b0 + self.A*np.abs(V)))**(1/4)
+
+        print(doping_term,bias_term)
 
         phi_b = self.phi_b0 - doping_term + bias_term
         
         
         """
-            IN CURRENT DENSITY (1 - np.exp(-abs(V)/self.kb_T)) SHOULD IT BE ABSOLUTE VALUE????
-            Not corret --> I need to include SBH1 + SBH2 + resistance of the channel (MoS2)
-            Two Schottky barriers: Metal to MoS2 + MoS2 + MoS2 to metal
-            
             Coupled equations, with a voltage drop in the two contacts and the channel
             
             Self-regulated by the rectifying behavior of the SBH
@@ -518,37 +516,55 @@ class ActiveMaterial():
     
     def Schottky_current(self,V):
         
-        potential = False
+        method_calculate_phi = ['potential','average_field','average_phi']
+        calculate_phi_used = method_calculate_phi[2]
         methods = ['Newton_raphson','Bisection']
         method_used = methods[0]
         
         
-        if potential:
+        if calculate_phi_used == 'potential':
             field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,:],(0,1)) # Average the plane xy
             field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,:],(0,1)) # Average the plane xy
             
             x = np.linspace(self.steps[2],self.device_size[2],self.Grid_states.shape[2])
     
-            PE_1 = np.argmax(- self.e_er * self.e_charge / (16*np.pi * x * 1e-9) - self.e_charge * x * 1e-9 * abs(field_interface_1[::-1]))
-            PE_2 = np.argmax(- self.e_er * self.e_charge / (16*np.pi * x * 1e-9) - self.e_charge * x * 1e-9 * abs(field_interface_2[::-1]))
+            PE_1 = np.argmax(- self.e_er * qe / (16*np.pi * x * 1e-9) - qe * x * 1e-9 * abs(field_interface_1[::-1]))
+            PE_2 = np.argmax(- self.e_er * qe / (16*np.pi * x * 1e-9) - qe * x * 1e-9 * abs(field_interface_2[::-1]))
             
             # Due to the electric field produce by the doping and the bias
             image_force_lowering_1 = np.sqrt(self.e_er * abs(field_interface_1[PE_1]) / (4 * np.pi))
             image_force_lowering_2 = np.sqrt(self.e_er * abs(field_interface_2[PE_2]) / (4 * np.pi))
+            
+            phi_b1 = self.phi_b0 - image_force_lowering_1
+            phi_b2 = self.phi_b0 - image_force_lowering_2
         
-        else:
-            field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-20:],(0,1)) # Average the plane xy
-            field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-20:],(0,1)) # Average the plane xy
+        elif calculate_phi_used == 'average_field':
+            field_interface_1 = np.mean(self.Ez[:self.electrodes[0],:,-6:],(0,1)) # Average the plane xy
+            field_interface_2 = np.mean(self.Ez[self.electrodes[1]:,:,-6:],(0,1)) # Average the plane xy
             
             
             image_force_lowering_1 = np.sqrt(self.e_er * max(abs(field_interface_1)) / (4 * np.pi))
             image_force_lowering_2 = np.sqrt(self.e_er * max(abs(field_interface_2)) / (4 * np.pi))
             
-            print(max(abs(field_interface_1))*1e-9,max(abs(field_interface_2))*1e-9)
+            phi_b1 = self.phi_b0 - image_force_lowering_1
+            phi_b2 = self.phi_b0 - image_force_lowering_2
+            
+        elif calculate_phi_used == 'average_phi':
+            
+            image_force_lowering_1 = np.sqrt(self.e_er * abs(self.Ez[:self.electrodes[0],:,-1]) / (4 * np.pi))
+            image_force_lowering_2 = np.sqrt(self.e_er * abs(self.Ez[self.electrodes[1]:,:,-1]) / (4 * np.pi))
+            #print(max(abs(field_interface_1))*1e-9,max(abs(field_interface_2))*1e-9)
+            
+            phi_b = np.zeros(self.Grid_states.shape[:2]) + self.phi_b0
+            
+            phi_b[:self.electrodes[0],:] -= image_force_lowering_1
+            phi_b[self.electrodes[1]:,:] -= image_force_lowering_2 
+            
+            phi_b1 = np.mean(phi_b[:self.electrodes[0],:])
+            phi_b2 = np.mean(phi_b[self.electrodes[1]:,:])
 
         
-        phi_b1 = self.phi_b0 - image_force_lowering_1
-        phi_b2 = self.phi_b0 - image_force_lowering_2
+
             
         exp_phi1 = np.exp(phi_b1/self.kb_T)
         exp_phi2 = np.exp(phi_b2/self.kb_T)
@@ -575,26 +591,49 @@ class ActiveMaterial():
 
         if method_used == methods[0]:
             
-            if V > 0:
+            
+            if V >= 0:
                 I1 = -I0 * (1/exp_phi1) * (np.exp(-V/Vt) - 1)
                 I2 = I0 * (1/exp_phi2) * (np.exp(V/Vt) - 1)
                 I3 = V/self.R
                 I = min(I1,I2,I3)
+                
+                if abs(I) < 1e-15:
+                    return 0
+                elif (I/I0) * exp_phi1 >= 1:
+                    return I1
 
-            else: 
+            elif V < 0:
                 I1 = I0 * (1/exp_phi1) * (np.exp(abs(V)/Vt) - 1)
                 I2 = -I0 * (1/exp_phi2) * (np.exp(-abs(V)/Vt) - 1)
                 I3 = abs(V)/self.R
                 I = min(I1,I2,I3)
                 
-            while (abs(f) >= self.tol):
+                if abs(I) < 1e-15:
+                    return 0
+                elif (I/I0) * exp_phi2 >= 1:
+                    return I2
+                
+                
+            while (abs(f) >= self.tol * abs(V)):
                     
                 if V > 0:
+                    
+
+                    if (I/I0) * exp_phi1 >= 0.99999999:
+                        return I 
+                    
                     f = Vt * np.log((I/I0) * exp_phi2 + 1) - Vt * np.log(1 - (I/I0) * exp_phi1) + I*self.R - V
                     df = (Vt * exp_phi2) / (I * exp_phi2 + I0) + Vt * exp_phi1 / (I0 - I * exp_phi1) + self.R
+                    
                 else:
+                    
+                    if (I/I0) * exp_phi2 >= 0.99999999:
+                        return I 
+                    
                     f = -Vt * np.log(1 - (I/I0) * exp_phi2) + Vt * np.log(1 + (I/I0) * exp_phi1) + I*self.R - abs(V)
                     df = (Vt * exp_phi2) / (I0 - I * exp_phi2) + Vt * exp_phi1 / (I0 + I * exp_phi1) + self.R
+
 
                 I=I-f/df
 

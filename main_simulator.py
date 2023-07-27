@@ -12,11 +12,11 @@ import matplotlib.pyplot as plt
 
 end = time.time()
 
-save_data = False
-save_var = False
+save_data = True
+save_var = True
 
 
-for n_sim in range(0,1):
+for n_sim in range(0,10):
     
     MoS2_layer,paths,rng,defects_list,V = initialization(n_sim,save_data)
     
@@ -62,4 +62,6 @@ for n_sim in range(0,1):
     if save_var: save_variables(paths['program'],variables)
 
 
+# Make a sound when it finishes
+print('\a')
     

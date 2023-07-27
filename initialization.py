@@ -27,7 +27,7 @@ def initialization(n_sim,save_data):
         files_copy = ['ActiveMaterial.py', 'balanced_tree.py','defects.py', 'initialization.py','KMC.py','main_simulator.py','V_waveform.py','load_variables.py']
         
         if platform.system() == 'Windows': # When running in laptop
-            dst = r'C:\Users\aldanads\OneDrive - Trinity College Dublin\2D device simulator project\Publications\Schottky barrier\Simulations\Testing\New scheme of switching _ 3\\'
+            dst = r'C:\Users\aldanads\OneDrive - TCDUD.onmicrosoft.com\2D device simulator project\Publications\Schottky barrier\Simulations\Testing_avg_phib\Symmetric SBH\\'
         elif platform.system() == 'Linux': # HPC works on Linux
             dst = r'/home/users/aldanads/Crystal growth/Simulations/Growth rate -  Diffusion rate/1.2eV/'
             
@@ -64,7 +64,7 @@ def initialization(n_sim,save_data):
 
     """
     er = 22 # Relative permitivity
-    screening = 0.2 # Screening of electric field
+    screening = [0.01,0.7] # Screening of electric field
     q = 2 # Particle charge
     
     """
@@ -79,11 +79,11 @@ def initialization(n_sim,save_data):
     #     # Activation energies 
     # =============================================================================
     """
-    E_diffusion = 0.9
-    E_lim = 0.65
+    E_diffusion = 1.1
+    E_lim = 0.73
     
     # Defects can migrate up-down, lateral x-axis and y-axis
-    Act_energy = [E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion+0.3,E_diffusion+0.3,E_lim]
+    Act_energy = [E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_diffusion,E_lim]
     
     # Temperature in kelvin (k)
     T = 300
@@ -99,12 +99,13 @@ def initialization(n_sim,save_data):
      Advanced Electronic Materials (2023): 2201252.
      Schottky barrier between 0.57-0.82 eV
      """
-    phi_b0 = 0.31 # Schottky barrier (eV) not modulated  (fitting parameter)
+    phi_b0 = 0.4 # Schottky barrier (eV) not modulated  (fitting parameter)
     w = 3E-9 # w (nm) is in the range of a few nanometers --> region with excess of dopants (fitting parameter)
-    A = 10E-5 # A constant
-    R = 5000
+    #A = 10E-5 # A constant
+    A = 1
+    R = 6E3
     ideality_factor = 2
-    tol = 1e-4
+    tol = 1e-2
     
     square_size = 4
     # Introducing defects in the active layer
@@ -119,10 +120,10 @@ def initialization(n_sim,save_data):
     shapes = ['forming','forming_triangle','triangle']
     shape_phase = [shapes[1],shapes[2]]
     MaxV = -1
-    wave_width = 8
+    wave_width = 4
     delta_t = 0.1 # Sampling time
-    V_forming = 1.5
-    t_forming = 2
+    V_forming = 3
+    t_forming = 3
     n_cycles = 1
     V = V_waveform(shape_phase,MaxV,wave_width,delta_t,V_forming,t_forming,n_cycles)
     
